@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0A7556">
+<meta name="description" content="Kalkulator patungan untuk bill yang dibayarin duluan, lengkap dengan service dan pajak.">
+<style>:root{color-scheme:light dark}html,body{margin:0}body{min-height:100vh}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Split Bill Nongkrong</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: mobile-first single column with a bottom tab bar (Dashboard, Split Bill, Teman).
+   From 860px the tabs move to the top and panels split into two columns.
+   The dashboard is a thermal-receipt card plus a list of transfers to the payer. */
+:root{
+  --bg:#E7EDEA;
+  --surface:#F5F8F6;
+  --paper:#FEFEFC;
+  --ink:#10201A;
+  --muted:#55675F;
+  --line:#C5D2CB;
+  --accent:#0A7556;
+  --accent-ink:#FFFFFF;
+  --mark:#FFD84A;
+  --mark-ink:#2B2300;
+  --err:#B3261E;
+  --err-bg:#FBE9E7;
+  --shadow:rgba(16,32,26,.18);
+  --f-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --f-body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C1511; --surface:#15211B; --paper:#1C2A24; --ink:#E4EEE9; --muted:#93A79E; --line:#2D3F37;
+    --accent:#3FD3A1; --accent-ink:#04231A; --mark:#E9C43C; --mark-ink:#1C1600; --err:#FF9C93; --err-bg:#3A1C19; --shadow:rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C1511; --surface:#15211B; --paper:#1C2A24; --ink:#E4EEE9; --muted:#93A79E; --line:#2D3F37;
+  --accent:#3FD3A1; --accent-ink:#04231A; --mark:#E9C43C; --mark-ink:#1C1600; --err:#FF9C93; --err-bg:#3A1C19; --shadow:rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--f-body);-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,p,ul,ol{margin:0}
+ul,ol{padding:0;list-style:none}
+
+.app{max-width:980px;margin:0 auto;padding-block:20px 112px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+.top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.logo{flex:none;width:40px;height:40px;border-radius:10px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+h1{font:800 26px/1.1 var(--f-display);letter-spacing:-.01em;text-wrap:balance}
+.tagline{color:var(--muted);max-width:52ch;margin-top:6px}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.small{min-height:40px;padding:0 12px;font-size:14px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.samplebar{background:var(--mark);color:var(--mark-ink);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-weight:500}
+.samplebar .btn{background:var(--mark-ink);border-color:var(--mark-ink);color:var(--mark)}
+
+/* tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;gap:6px;background:var(--surface);border-top:1px solid var(--line);padding:6px max(16px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.tab{position:relative;flex:1;min-height:54px;border:0;border-radius:10px;background:transparent;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:600;font-size:13px}
+.tab svg{width:22px;height:22px}
+.tab[aria-selected="true"]{color:var(--accent);background:var(--bg)}
+.tab[data-n]:not([data-n="0"])::after{content:"";position:absolute;top:8px;right:calc(50% - 20px);width:9px;height:9px;border-radius:50%;background:var(--err)}
+
+.panel{display:grid;gap:16px;align-content:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;min-width:0}
+h2{font:800 18px/1.2 var(--f-display);text-wrap:balance}
+.hint{color:var(--muted);font-size:14px}
+.stack{display:grid;gap:16px;min-width:0}
+
+/* inputs */
+.in{width:100%;min-height:44px;border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:0 12px;font-size:16px;min-width:0}
+select.in{padding-right:8px}
+.field{display:grid;gap:6px;min-width:0}
+.field>span{font-weight:600;font-size:14px}
+.money{display:flex;align-items:center;gap:6px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--paper);padding-left:10px;min-width:0}
+.money:focus-within{outline:2px solid var(--accent)}
+.money span{color:var(--muted);font:500 13px var(--f-mono)}
+.money input{flex:1;min-width:0;min-height:42px;border:0;outline:0;background:transparent;text-align:right;padding:0 10px 0 0;font:500 16px var(--f-mono)}
+[aria-invalid="true"]{border-color:var(--err)!important}
+.money:has([aria-invalid="true"]){border-color:var(--err)}
+.icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:22px;line-height:1;display:grid;place-items:center}
+.icon-btn:hover{background:var(--line)}
+
+/* items */
+.items{display:grid;gap:10px}
+.item{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--paper);display:grid;gap:8px;min-width:0}
+.item-top{display:grid;grid-template-columns:minmax(0,1fr) 8.75rem 40px;gap:8px;align-items:center}
+.item .in{background:var(--surface)}
+.item .money{background:var(--surface)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-weight:500;font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip.all{border-style:dashed}
+.rowmeta{font:400 13px var(--f-mono);color:var(--muted);min-height:1.2em}
+.rowmeta.err{color:var(--err);font-family:var(--f-body);font-size:14px;font-weight:500}
+
+/* fees */
+.fee{display:grid;gap:6px;padding-top:12px;border-top:1px dashed var(--line)}
+.fee:first-of-type{border-top:0;padding-top:0}
+.fee-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.fee-head label{font-weight:600}
+.fee-amt{font:500 13px var(--f-mono);color:var(--muted)}
+.fee-ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fee-ctl .in{flex:1 1 7rem;font-family:var(--f-mono);text-align:right}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper)}
+.seg button{min-height:40px;padding:0 14px;border:0;background:transparent;font-weight:600;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg.full{display:grid;grid-template-columns:1fr 1fr;width:100%}
+.sw{display:grid;gap:6px;padding-top:12px;border-top:1px dashed var(--line)}
+.sw>b{font-size:14px}
+
+.alert{border:1px solid var(--err);background:var(--err-bg);color:var(--ink);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.alert strong{color:var(--err)}
+.alert ul{display:grid;gap:4px;padding-left:18px;list-style:disc}
+.alert .row{display:flex;gap:8px;flex-wrap:wrap}
+.note{border:1px dashed var(--line);border-radius:12px;padding:12px 14px;color:var(--muted);font-size:14px}
+
+.minibar{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 12px 10px 16px}
+.minibar b{font:600 18px var(--f-mono)}
+.minibar .btn{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+/* people */
+.people{display:grid;gap:8px}
+.person{display:grid;grid-template-columns:auto minmax(0,1fr) 40px;gap:8px;align-items:center;border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:6px 6px 6px 10px}
+.person.is-payer{border-color:var(--accent)}
+.pick{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--muted);min-height:40px;cursor:pointer}
+.pick input{width:20px;height:20px;accent-color:var(--accent)}
+.person.is-payer .pick{color:var(--accent)}
+.person .in{background:var(--surface)}
+.addrow{display:flex;gap:8px}
+.addrow .in{flex:1}
+
+/* dashboard */
+.dash{display:grid;gap:16px}
+.struk-wrap{filter:drop-shadow(0 8px 14px var(--shadow));min-width:0}
+.struk{background:var(--paper);font:400 13.5px/1.55 var(--f-mono);padding:20px 18px 34px;border-radius:4px 4px 0 0;
+  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/16px 100%;
+  mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/16px 100%}
+.struk h2{font:600 14px var(--f-mono);letter-spacing:.14em;text-align:center;text-transform:uppercase}
+.struk .meta{text-align:center;color:var(--muted);font-size:12px;margin-top:2px}
+.rule{border-top:1px dashed var(--line);margin:12px 0}
+.ln{display:flex;justify-content:space-between;gap:12px}
+.ln span:last-child{white-space:nowrap;text-align:right}
+.ln.neg span:last-child{color:var(--muted)}
+.ln.total{font-size:17px;font-weight:600;align-items:baseline}
+.mark{background:linear-gradient(transparent 10%,var(--mark) 10% 90%,transparent 90%);color:var(--mark-ink);padding:0 .35em}
+.struk .foot{color:var(--muted);font-size:12px;margin-top:10px;text-align:center}
+
+.acct{border:1px solid var(--accent);border-radius:14px;background:var(--surface);padding:14px 16px;display:grid;gap:8px}
+.acct .who{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;color:var(--muted);font-size:14px}
+.acct .bank{color:var(--ink);font-weight:700;font-size:16px}
+.acct .num{font:600 22px/1.2 var(--f-mono);letter-spacing:.02em;word-break:break-all}
+.acct.missing{border-style:dashed;border-color:var(--line)}
+.sec-title{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.owed{display:grid;gap:8px}
+.owe{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.owe-row{display:flex;align-items:stretch}
+.owe-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 12px;border:0;background:transparent;text-align:left;min-height:62px}
+.avatar{flex:none;width:36px;height:36px;border-radius:50%;background:var(--line);display:grid;place-items:center;font:800 14px var(--f-display)}
+.owe-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.owe-name small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.owe-amt{margin-left:auto;font:600 17px var(--f-mono);white-space:nowrap}
+.copy-btn{flex:none;min-width:76px;border:0;border-left:1px solid var(--line);background:transparent;font-weight:600;font-size:14px;color:var(--accent)}
+.owe.payer{background:transparent;border-style:dashed}
+.owe-detail{border-top:1px dashed var(--line);padding:8px 14px 12px;font:400 13px/1.6 var(--f-mono)}
+.owe-detail .ln.sub{border-top:1px dashed var(--line);margin-top:4px;padding-top:4px}
+.owe-detail .ln.end{font-weight:600}
+.steps{display:grid;gap:10px;counter-reset:s}
+.steps li{display:flex;gap:12px;align-items:flex-start;counter-increment:s}
+.steps li::before{content:counter(s);flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font:600 13px var(--f-mono)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;max-width:calc(100vw - 32px);background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 14px;font-weight:500;user-select:text;-webkit-user-select:text}
+
+@media (min-width:860px){
+  .app{padding-block:40px 64px;gap:20px}
+  h1{font-size:32px}
+  .tabs{position:static;background:none;border:0;padding:0;justify-content:flex-start;gap:8px}
+  .tab{flex:0 0 auto;flex-direction:row;padding:0 18px;gap:8px;min-height:46px;border:1px solid var(--line);background:var(--surface)}
+  .tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .tab[data-n]:not([data-n="0"])::after{top:10px;right:8px}
+  .panel.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+  .panel.two .span{grid-column:1/-1}
+  .dash{grid-template-columns:minmax(0,380px) minmax(0,1fr);align-items:start}
+  .minibar{bottom:16px}
+  .toast{bottom:32px}
+}
+@media (max-width:380px){
+  .item-top{grid-template-columns:minmax(0,1fr) 7.5rem 36px}
+  h1{font-size:23px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
+      </div>
+      <div>
+        <h1>Split Bill Nongkrong</h1>
+      </div>
+    </div>
+    <button type="button" class="btn small" id="resetBtn">Bill baru</button>
+  </header>
+  <p class="tagline" style="margin-top:-8px">Bagi bill makan bareng yang dibayarin duluan, lengkap dengan service dan pajak. Data hanya ada di halaman ini dan hilang saat ditutup.</p>
+
+  <div class="samplebar" id="sampleBar">
+    <span>Ini data contoh, bukan bill kamu. Ganti angkanya atau mulai dari kosong.</span>
+    <button type="button" class="btn small" id="sampleClear">Mulai dari kosong</button>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Menu utama">
+    <button type="button" class="tab" role="tab" id="tab-dash" aria-controls="panel-dash" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button type="button" class="tab" role="tab" id="tab-split" aria-controls="panel-split" aria-selected="false" tabindex="-1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/></svg>
+      <span>Split Bill</span>
+    </button>
+    <button type="button" class="tab" role="tab" id="tab-teman" aria-controls="panel-teman" aria-selected="false" tabindex="-1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M18 14.8c1.9.7 3.2 2.4 3.5 5.2"/></svg>
+      <span>Teman</span>
+    </button>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <section class="panel" id="panel-dash" role="tabpanel" aria-labelledby="tab-dash">
+    <div class="card" id="dashEmpty" hidden>
+      <h2>Belum ada bill yang dihitung</h2>
+      <ol class="steps">
+        <li><span><b>Tambah teman</b> di tab Teman, lalu pilih siapa yang membayari bill lebih dulu.</span></li>
+        <li><span><b>Isi menu dan harganya</b> di tab Split Bill, centang siapa yang makan, lalu isi service dan pajak dari struk.</span></li>
+        <li><span><b>Lihat hasilnya di sini.</b> Tiap teman tahu berapa yang harus ditransfer.</span></li>
+      </ol>
+      <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn primary" data-go="teman">Mulai dari Teman</button>
+        <button type="button" class="btn" data-go="split">Isi menu</button>
+      </div>
+    </div>
+    <div class="alert" id="dashAlert" role="alert" hidden></div>
+    <div class="dash" id="dashMain" hidden>
+      <div class="struk-wrap"><article class="struk" id="struk" aria-label="Ringkasan bill"></article></div>
+      <div class="stack">
+        <div id="payCard"></div>
+        <section class="stack" aria-labelledby="owedTitle">
+          <div class="sec-title"><h2 id="owedTitle">Tagihan per orang</h2><span class="hint" id="inflow"></span></div>
+          <ul class="owed" id="owedList"></ul>
+          <p class="hint" id="roundNote"></p>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- SPLIT BILL -->
+  <section class="panel two" id="panel-split" role="tabpanel" aria-labelledby="tab-split" hidden>
+    <div class="alert span" id="splitAlert" role="alert" hidden></div>
+    <div class="card">
+      <h2>Menu yang dipesan</h2>
+      <p class="hint">Isi harga satu baris menu, lalu centang siapa yang makan atau minum. Kalau dicentang beberapa orang, harganya dibagi rata di antara mereka.</p>
+      <ul class="items" id="itemsList"></ul>
+      <button type="button" class="btn" id="addItem">+ Tambah menu</button>
+    </div>
+    <div class="card">
+      <h2>Pajak dan biaya</h2>
+      <p class="hint">Isi seperti yang tertera di struk. Setiap komponen bisa berupa persen atau rupiah. Semuanya dibagi sesuai porsi belanja masing-masing.</p>
+      <div id="feesBox"></div>
+      <div class="sw">
+        <b id="lbl-taxbase">Pajak dihitung dari</b>
+        <div class="seg full" role="group" aria-labelledby="lbl-taxbase" data-seg="taxBase">
+          <button type="button" data-v="withService" aria-pressed="true">Subtotal + service</button>
+          <button type="button" data-v="subtotal" aria-pressed="false">Subtotal saja</button>
+        </div>
+        <p class="hint" id="hint-taxbase"></p>
+      </div>
+      <div class="sw">
+        <b id="lbl-disc">Urutan diskon</b>
+        <div class="seg full" role="group" aria-labelledby="lbl-disc" data-seg="discOrder">
+          <button type="button" data-v="before" aria-pressed="true">Sebelum pajak</button>
+          <button type="button" data-v="after" aria-pressed="false">Sesudah pajak</button>
+        </div>
+        <p class="hint" id="hint-disc"></p>
+      </div>
+    </div>
+    <div class="minibar span" id="minibar">
+      <div><div style="font-size:13px;opacity:.8" id="miniLabel">Total bill</div><b id="miniTotal">Rp 0</b></div>
+      <button type="button" class="btn" data-go="dash" id="miniBtn">Lihat hasil</button>
+    </div>
+  </section>
+
+  <!-- TEMAN -->
+  <section class="panel two" id="panel-teman" role="tabpanel" aria-labelledby="tab-teman" hidden>
+    <div class="alert span" id="peopleAlert" role="alert" hidden></div>
+    <div class="card">
+      <h2>Siapa saja yang ikut?</h2>
+      <p class="hint">Pilih satu orang sebagai pembayar, yaitu yang membayari bill lebih dulu. Pembayar ikut makan dan ikut dihitung porsinya.</p>
+      <ul class="people" id="peopleList"></ul>
+      <form class="addrow" id="addForm" autocomplete="off">
+        <input class="in" id="newName" type="text" maxlength="60" placeholder="Nama, atau beberapa nama dipisah koma" aria-label="Nama teman baru" enterkeyhint="done">
+        <button type="submit" class="btn primary">Tambah</button>
+      </form>
+      <p class="rowmeta err" id="addErr" hidden></p>
+    </div>
+    <div class="card">
+      <h2>Rekening pembayar</h2>
+      <p class="hint">Tampil di Dashboard supaya teman bisa langsung transfer. Tidak ada pembayaran di app ini, hanya info untuk disalin.</p>
+      <label class="field"><span>Bank atau e-wallet</span>
+        <select class="in" id="payBank">
+          <option value="">Pilih bank atau e-wallet</option>
+          <optgroup label="Bank">
+            <option>BCA</option><option>Mandiri</option><option>BNI</option><option>BRI</option><option>BSI</option><option>CIMB Niaga</option><option>Permata</option><option>Jago</option><option>SeaBank</option><option>blu by BCA</option><option>Jenius</option>
+          </optgroup>
+          <optgroup label="E-wallet">
+            <option>GoPay</option><option>OVO</option><option>DANA</option><option>ShopeePay</option><option>LinkAja</option>
+          </optgroup>
+          <option value="Lainnya">Lainnya</option>
+        </select>
+      </label>
+      <label class="field" id="payOtherWrap" hidden><span>Nama bank atau e-wallet</span><input class="in" id="payOther" type="text" maxlength="30" autocomplete="off"></label>
+      <label class="field"><span>Nomor rekening atau HP</span><input class="in" id="payNumber" type="text" inputmode="numeric" maxlength="30" autocomplete="off" placeholder="Hanya angka"></label>
+      <label class="field"><span>Atas nama</span><input class="in" id="payHolder" type="text" maxlength="40" autocomplete="off"></label>
+      <p class="rowmeta err" id="payErr" hidden></p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+/*PURE-START*/
+function parseNum(raw, kind){
+  var s = String(raw == null ? '' : raw).trim().replace(/^rp\.?\s*/i, '').replace(/\s+/g, '');
+  if (s === '') return {empty:true, ok:true, value:0};
+  if (/^-/.test(s)) return {ok:false, neg:true};
+  if (/[^0-9.,]/.test(s)) return {ok:false};
+  if (kind === 'pct') {
+    s = s.replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(s)) return {ok:false};
+  } else if (s.indexOf(',') >= 0) {
+    if (/^\d{1,3}(\.\d{3})*,\d{1,2}$/.test(s) || /^\d+,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+    else return {ok:false};
+  } else if (s.indexOf('.') >= 0) {
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+    else if (!/^\d+\.\d{1,2}$/.test(s)) return {ok:false};
+  }
+  var v = Number(s);
+  return isFinite(v) ? {ok:true, value:v} : {ok:false};
+}
+function idr(n){
+  var r = Math.round(Math.abs(n));
+  return (n < -0.5 ? '−' : '') + 'Rp ' + r.toLocaleString('id-ID');
+}
+function pctText(v){ return v.toLocaleString('id-ID', {maximumFractionDigits:2}) + '%'; }
+function payDigits(s){ return String(s || '').replace(/[\s-]/g, ''); }
+function payNumberOk(s){ return /^\d{5,20}$/.test(payDigits(s)); }
+
+/* Round parts so that base - discount + fees equals target exactly. parts[0] is the base. */
+function tieRound(parts, target){
+  var r = parts.map(function(p){ return Math.round(p.v); });
+  var sum = 0;
+  parts.forEach(function(p, i){ sum += p.sign * r[i]; });
+  var resid = target - sum;
+  if (resid !== 0) {
+    var k = 0, best = 0;
+    for (var i = 1; i < parts.length; i++) if (parts[i].v > best) { best = parts[i].v; k = i; }
+    r[k] += resid * parts[k].sign;
+  }
+  return r;
+}
+
+function computeBill(st){
+  var E = [], W = [], itemErr = {}, feeErr = {};
+  var people = st.people;
+  people.forEach(function(p, i){
+    if (!p.name.trim()) E.push({scope:'people', msg:'Teman ke-' + (i + 1) + ' belum diberi nama.'});
+  });
+  var seen = {};
+  people.forEach(function(p){ var n = p.name.trim().toLowerCase(); if (n) seen[n] = (seen[n] || 0) + 1; });
+  Object.keys(seen).forEach(function(k){
+    if (seen[k] > 1) {
+      var nm = people.filter(function(p){ return p.name.trim().toLowerCase() === k; })[0].name.trim();
+      E.push({scope:'people', msg:'Nama "' + nm + '" dipakai lebih dari satu orang. Tambahkan inisial supaya berbeda.'});
+    }
+  });
+  if (people.length < 2) {
+    E.push({scope:'people', msg: people.length ? 'Tambahkan minimal satu teman selain pembayar.' : 'Belum ada peserta. Tambahkan pembayar dan teman-temannya.'});
+  }
+
+  var S = 0, I = {}, lines = [];
+  people.forEach(function(p){ I[p.id] = 0; });
+  st.items.forEach(function(it, i){
+    var label = it.name.trim() || ('Menu ' + (i + 1));
+    var pr = parseNum(it.price, 'money');
+    var priceMsg = '', whoMsg = '';
+    if (pr.empty) priceMsg = 'Harga belum diisi.';
+    else if (!pr.ok) priceMsg = pr.neg ? 'Harga tidak boleh minus.' : 'Harga "' + it.price + '" tidak bisa dibaca. Tulis angka saja, misalnya 25000 atau 25.000.';
+    else if (pr.value <= 0) priceMsg = 'Harga harus lebih dari 0.';
+    else if (pr.value > 100000000) priceMsg = 'Harga terlalu besar (maksimal Rp 100.000.000). Cek jumlah nolnya.';
+    var who = it.who.filter(function(id){ return I[id] !== undefined; });
+    if (!who.length) whoMsg = 'Belum ada yang dicentang. Pilih siapa yang makan atau minum ini.';
+    itemErr[it.id] = {price:priceMsg, who:whoMsg};
+    if (priceMsg) E.push({scope:'items', itemId:it.id, msg:label + ': ' + priceMsg});
+    if (whoMsg) E.push({scope:'items', itemId:it.id, msg:label + ': ' + whoMsg});
+    if (!priceMsg) {
+      S += pr.value;
+      if (who.length) {
+        who.forEach(function(id){ I[id] += pr.value / who.length; });
+        lines.push({id:it.id, label:label, price:pr.value, who:who});
+      }
+    }
+  });
+
+  function feeVal(key, name){
+    var f = st.fees[key], pct = f.mode === 'pct';
+    var pr = parseNum(f.val, pct ? 'pct' : 'money');
+    if (pr.empty) return 0;
+    var msg = '';
+    if (!pr.ok) msg = pr.neg ? name + ' tidak boleh minus.' : (pct ? name + ': tulis angka persen saja, misalnya 10 atau 7,5.' : name + ': tulis angka rupiah saja, misalnya 20000 atau 20.000.');
+    else if (pct && pr.value > 100) msg = name + ' tidak boleh lebih dari 100%.';
+    else if (!pct && pr.value > 100000000) msg = name + ' terlalu besar. Cek jumlah nolnya.';
+    if (msg) { feeErr[key] = msg; E.push({scope:'fees', msg:msg}); return 0; }
+    return pr.value;
+  }
+  var dv = feeVal('discount', 'Diskon'), sv = feeVal('service', 'Service'), tv = feeVal('tax', 'Pajak');
+  var dm = st.fees.discount.mode, sm = st.fees.service.mode, tm = st.fees.tax.mode;
+  var before = st.discOrder === 'before';
+  var D = 0, svc = 0, tax = 0;
+  function capDiscount(limit){
+    if (D > limit + 0.0001 && limit >= 0) {
+      var m = 'Diskon (' + idr(D) + ') melebihi ' + (before ? 'subtotal' : 'total setelah pajak') + ' (' + idr(limit) + '). Kurangi diskonnya.';
+      feeErr.discount = m; E.push({scope:'fees', msg:m}); D = limit;
+    }
+  }
+  if (before) { D = dm === 'pct' ? S * dv / 100 : dv; capDiscount(S); }
+  var base1 = before ? S - D : S;
+  svc = sm === 'pct' ? base1 * sv / 100 : sv;
+  var taxBase = st.taxBase === 'withService' ? base1 + svc : base1;
+  tax = tm === 'pct' ? taxBase * tv / 100 : tv;
+  if (!before) { var gross = S + svc + tax; D = dm === 'pct' ? gross * dv / 100 : dv; capDiscount(gross); }
+  var total = S - D + svc + tax;
+  var totalR = Math.round(total);
+
+  var payer = null;
+  for (var i = 0; i < people.length; i++) if (people[i].id === st.payerId) payer = people[i];
+  if (!payer && people.length) payer = people[0];
+
+  var rows = [], others = 0;
+  if (S > 0) {
+    people.forEach(function(p){
+      var w = I[p.id] / S;
+      var row = {p:p, w:w, items:I[p.id], disc:D * w, svc:svc * w, tax:tax * w, exact:total * w, isPayer:!!payer && p.id === payer.id};
+      if (!row.isPayer) { row.pay = Math.round(row.exact); others += row.pay; }
+      rows.push(row);
+    });
+    rows.forEach(function(r){ if (r.isPayer) { r.pay = totalR - others; r.diff = r.pay - Math.round(r.exact); } });
+  }
+
+  var num = st.pay.number.trim();
+  if (!num) W.push({scope:'pay', msg:'Rekening pembayar belum diisi. Teman belum tahu harus transfer ke mana.'});
+  else if (!payNumberOk(num)) W.push({scope:'pay', msg:'Nomor rekening hanya boleh angka, panjangnya 5 sampai 20 digit.'});
+
+  return {E:E, W:W, itemErr:itemErr, feeErr:feeErr, S:S, D:D, svc:svc, tax:tax, total:total, totalR:totalR,
+          rows:rows, payer:payer, lines:lines, inflow:others, before:before};
+}
+
+function feeLines(r, st){
+  var out = [];
+  function mk(key, name, amt, sign){
+    if (amt > 0.0001) {
+      var f = st.fees[key], p = parseNum(f.val, 'pct');
+      out.push({key:key, label: f.mode === 'pct' && p.ok && !p.empty ? name + ' ' + pctText(p.value) : name, amt:amt, sign:sign});
+    }
+  }
+  if (r.before) { mk('discount', 'Diskon', r.D, -1); mk('service', 'Service', r.svc, 1); mk('tax', 'Pajak', r.tax, 1); }
+  else { mk('service', 'Service', r.svc, 1); mk('tax', 'Pajak', r.tax, 1); mk('discount', 'Diskon', r.D, -1); }
+  return out;
+}
+/*PURE-END*/
+</script>
+
+<script>
+(function(){
+'use strict';
+var $ = function(s, el){ return (el || document).querySelector(s); };
+var $$ = function(s, el){ return Array.prototype.slice.call((el || document).querySelectorAll(s)); };
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+var uidN = 0;
+function uid(p){ return p + (++uidN); }
+
+var FEES = [
+  {key:'discount', label:'Diskon atau voucher', name:'Diskon'},
+  {key:'service',  label:'Service charge', name:'Service'},
+  {key:'tax',      label:'Pajak resto (PB1/PBJT/PPN)', name:'Pajak'}
+];
+
+function blankState(){
+  return {sample:false, reviewed:false, people:[], payerId:null,
+    pay:{bank:'', other:'', number:'', holder:''}, items:[],
+    fees:{discount:{mode:'nom', val:''}, service:{mode:'pct', val:''}, tax:{mode:'pct', val:''}},
+    taxBase:'withService', discOrder:'before'};
+}
+function sampleState(){
+  var a = uid('p'), b = uid('p'), c = uid('p'), d = uid('p');
+  var all = [a, b, c, d];
+  function it(n, p, w){ return {id:uid('i'), name:n, price:p, who:w, touched:true}; }
+  return {sample:true, reviewed:true,
+    people:[{id:a, name:'Raka'}, {id:b, name:'Dinda'}, {id:c, name:'Bimo'}, {id:d, name:'Sari'}],
+    payerId:a,
+    pay:{bank:'BCA', other:'', number:'0123456789', holder:'Raka (contoh)'},
+    items:[
+      it('Nasi goreng kambing', '38.000', [a]),
+      it('Mie goreng seafood', '35.000', [b]),
+      it('Ayam bakar madu', '42.000', [c]),
+      it('Tahu crispy', '24.000', [d]),
+      it('Es teh manis x4', '20.000', all),
+      it('Kentang goreng', '28.000', [a, b, d]),
+      it('Sate ayam', '36.000', [c, d])
+    ],
+    fees:{discount:{mode:'nom', val:'20.000'}, service:{mode:'pct', val:'5'}, tax:{mode:'pct', val:'10'}},
+    taxBase:'withService', discOrder:'before'};
+}
+var state = sampleState();
+var last = null;
+var openIds = {};
+
+/* ---------- toast + copy ---------- */
+var toastT;
+function toast(msg, manual){
+  var t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  if (manual) { try { var r = document.createRange(); r.selectNodeContents(t); var s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {} }
+  clearTimeout(toastT);
+  toastT = setTimeout(function(){ t.hidden = true; }, manual ? 7000 : 2200);
+}
+function copyText(text, okMsg){
+  function fallback(){
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand('copy'); ta.remove();
+      if (ok) { toast(okMsg); return; }
+    } catch (e) {}
+    toast('Salin manual: ' + text, true);
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function(){ toast(okMsg); }, fallback);
+    else fallback();
+  } catch (e) { fallback(); }
+}
+
+/* ---------- tabs ---------- */
+var TABS = ['dash', 'split', 'teman'];
+function showTab(t, focusSel){
+  TABS.forEach(function(k){
+    var on = k === t, b = $('#tab-' + k);
+    b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1;
+    $('#panel-' + k).hidden = !on;
+  });
+  if (t === 'dash' && !state.reviewed) { state.reviewed = true; recalc(); }
+  window.scrollTo(0, 0);
+  if (focusSel) { var el = $(focusSel); if (el) el.focus({preventScroll:true}); }
+}
+$$('.tab').forEach(function(b){
+  b.addEventListener('click', function(){ showTab(b.id.replace('tab-', '')); });
+  b.addEventListener('keydown', function(e){
+    var i = TABS.indexOf(b.id.replace('tab-', '')), n = -1;
+    if (e.key === 'ArrowRight') n = (i + 1) % 3; else if (e.key === 'ArrowLeft') n = (i + 2) % 3;
+    if (n >= 0) { e.preventDefault(); showTab(TABS[n]); $('#tab-' + TABS[n]).focus(); }
+  });
+});
+document.addEventListener('click', function(e){
+  var g = e.target.closest('[data-go]');
+  if (g) showTab(g.getAttribute('data-go'), g.getAttribute('data-focus'));
+});
+
+/* ---------- people ---------- */
+function personLabel(p){ return p.name.trim() || '(tanpa nama)'; }
+function renderPeople(){
+  $('#peopleList').innerHTML = state.people.map(function(p){
+    var pay = p.id === state.payerId;
+    return '<li class="person' + (pay ? ' is-payer' : '') + '" data-id="' + p.id + '">' +
+      '<label class="pick"><input type="radio" name="payer" value="' + p.id + '"' + (pay ? ' checked' : '') + '><span>' + (pay ? 'Pembayar' : 'Bayarin') + '</span></label>' +
+      '<input class="in p-name" type="text" maxlength="20" value="' + esc(p.name) + '" aria-label="Nama teman" autocomplete="off">' +
+      '<button type="button" class="icon-btn" data-act="del-person" aria-label="Hapus ' + esc(personLabel(p)) + '">×</button></li>';
+  }).join('');
+}
+$('#peopleList').addEventListener('input', function(e){
+  if (!e.target.classList.contains('p-name')) return;
+  var id = e.target.closest('.person').getAttribute('data-id');
+  var p = state.people.filter(function(x){ return x.id === id; })[0];
+  p.name = e.target.value; touch();
+  $$('.chip[data-pid="' + id + '"]').forEach(function(c){ c.textContent = personLabel(p); });
+  recalc();
+});
+$('#peopleList').addEventListener('change', function(e){
+  if (e.target.name !== 'payer') return;
+  state.payerId = e.target.value; touch(); renderPeople(); recalc();
+});
+$('#peopleList').addEventListener('click', function(e){
+  var b = e.target.closest('[data-act="del-person"]'); if (!b) return;
+  var id = b.closest('.person').getAttribute('data-id');
+  state.people = state.people.filter(function(p){ return p.id !== id; });
+  state.items.forEach(function(it){ it.who = it.who.filter(function(w){ return w !== id; }); });
+  if (state.payerId === id) state.payerId = state.people.length ? state.people[0].id : null;
+  touch(); renderPeople(); renderItems(); recalc();
+});
+$('#addForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  var inp = $('#newName'), err = $('#addErr');
+  var names = inp.value.split(/[,\n]/).map(function(s){ return s.trim().slice(0, 20); }).filter(Boolean);
+  function fail(m){ err.textContent = m; err.hidden = false; }
+  if (!names.length) return fail('Tulis nama dulu, misalnya Dinda.');
+  var added = 0, skipped = [];
+  names.forEach(function(n){
+    var dup = state.people.some(function(p){ return p.name.trim().toLowerCase() === n.toLowerCase(); });
+    if (dup) { skipped.push(n); return; }
+    if (state.people.length >= 20) return;
+    var p = {id:uid('p'), name:n};
+    state.people.push(p); if (!state.payerId) state.payerId = p.id; added++;
+  });
+  if (state.people.length >= 20 && added < names.length - skipped.length) return fail('Maksimal 20 orang per bill.');
+  if (skipped.length && !added) return fail('Nama ' + skipped.join(', ') + ' sudah ada. Beri nama berbeda, misalnya tambah inisial.');
+  err.hidden = true; inp.value = '';
+  if (skipped.length) toast('Dilewati karena sudah ada: ' + skipped.join(', '));
+  touch(); renderPeople(); renderItems(); recalc(); inp.focus();
+});
+
+/* ---------- pay info ---------- */
+function bindPay(){
+  $('#payBank').addEventListener('change', function(e){ state.pay.bank = e.target.value; touch(); syncPayOther(); recalc(); });
+  ['Other', 'Number', 'Holder'].forEach(function(k){
+    $('#pay' + k).addEventListener('input', function(e){ state.pay[k.toLowerCase()] = e.target.value; touch(); recalc(); });
+  });
+}
+function syncPayOther(){ $('#payOtherWrap').hidden = state.pay.bank !== 'Lainnya'; }
+
+/* ---------- items ---------- */
+function allChipOn(it){ return state.people.length > 0 && state.people.every(function(p){ return it.who.indexOf(p.id) >= 0; }); }
+function itemHTML(it){
+  var chips = state.people.length ? '<button type="button" class="chip all" data-act="all" aria-pressed="' + allChipOn(it) + '">Semua</button>' +
+    state.people.map(function(p){
+      return '<button type="button" class="chip" data-act="who" data-pid="' + p.id + '" aria-pressed="' + (it.who.indexOf(p.id) >= 0) + '">' + esc(personLabel(p)) + '</button>';
+    }).join('') : '<span class="hint">Tambah teman dulu di tab Teman.</span>';
+  return '<li class="item" data-id="' + it.id + '">' +
+    '<div class="item-top">' +
+      '<input class="in" data-f="name" type="text" maxlength="40" placeholder="Nama menu" value="' + esc(it.name) + '" aria-label="Nama menu" autocomplete="off">' +
+      '<label class="money"><span>Rp</span><input data-f="price" type="text" inputmode="numeric" placeholder="0" value="' + esc(it.price) + '" aria-label="Harga menu" autocomplete="off"></label>' +
+      '<button type="button" class="icon-btn" data-act="del-item" aria-label="Hapus menu">×</button>' +
+    '</div>' +
+    '<div class="chips" role="group" aria-label="Siapa yang makan atau minum">' + chips + '</div>' +
+    '<p class="rowmeta"></p></li>';
+}
+function renderItems(){
+  $('#itemsList').innerHTML = state.items.map(itemHTML).join('') ||
+    '<li class="note">Belum ada menu. Tekan Tambah menu untuk mulai.</li>';
+}
+function itemOf(el){ var id = el.closest('.item').getAttribute('data-id'); return state.items.filter(function(x){ return x.id === id; })[0]; }
+$('#itemsList').addEventListener('input', function(e){
+  var f = e.target.getAttribute('data-f'); if (!f) return;
+  var it = itemOf(e.target); it[f] = e.target.value; it.touched = true; touch(); recalc();
+});
+$('#itemsList').addEventListener('focusout', function(e){
+  if (e.target.getAttribute('data-f') !== 'price') return;
+  var it = itemOf(e.target), p = parseNum(it.price, 'money');
+  if (p.ok && !p.empty) { it.price = p.value.toLocaleString('id-ID', {maximumFractionDigits:2}); e.target.value = it.price; recalc(); }
+});
+$('#itemsList').addEventListener('click', function(e){
+  var b = e.target.closest('[data-act]'); if (!b) return;
+  var act = b.getAttribute('data-act'), li = b.closest('.item'), it = itemOf(b);
+  if (act === 'del-item') {
+    state.items = state.items.filter(function(x){ return x !== it; });
+    touch(); renderItems(); recalc(); return;
+  }
+  it.touched = true; touch();
+  if (act === 'all') it.who = allChipOn(it) ? [] : state.people.map(function(p){ return p.id; });
+  if (act === 'who') {
+    var pid = b.getAttribute('data-pid'), i = it.who.indexOf(pid);
+    if (i >= 0) it.who.splice(i, 1); else it.who.push(pid);
+  }
+  $$('.chip', li).forEach(function(c){
+    var on = c.getAttribute('data-act') === 'all' ? allChipOn(it) : it.who.indexOf(c.getAttribute('data-pid')) >= 0;
+    c.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  recalc();
+});
+$('#addItem').addEventListener('click', function(){
+  touch();
+  state.items.push({id:uid('i'), name:'', price:'', who:[], touched:false});
+  renderItems(); recalc();
+  var ins = $$('#itemsList [data-f="name"]'); if (ins.length) ins[ins.length - 1].focus();
+});
+
+/* ---------- fees ---------- */
+function buildFees(){
+  $('#feesBox').innerHTML = FEES.map(function(f){
+    return '<div class="fee" data-fee="' + f.key + '">' +
+      '<div class="fee-head"><label for="fee-' + f.key + '">' + f.label + '</label><span class="fee-amt" id="amt-' + f.key + '">= Rp 0</span></div>' +
+      '<div class="fee-ctl"><input class="in" id="fee-' + f.key + '" type="text" inputmode="decimal" placeholder="0" autocomplete="off">' +
+      '<div class="seg" role="group" aria-label="Satuan ' + f.name + '"><button type="button" data-v="pct">%</button><button type="button" data-v="nom">Rp</button></div></div>' +
+      '<p class="rowmeta err" id="err-' + f.key + '" hidden></p></div>';
+  }).join('');
+  FEES.forEach(function(f){
+    var inp = $('#fee-' + f.key);
+    inp.addEventListener('input', function(){ state.fees[f.key].val = inp.value; touch(); recalc(); });
+    inp.addEventListener('blur', function(){
+      var fe = state.fees[f.key], p = parseNum(fe.val, fe.mode === 'pct' ? 'pct' : 'money');
+      if (p.ok && !p.empty) { fe.val = p.value.toLocaleString('id-ID', {maximumFractionDigits:2}); inp.value = fe.val; recalc(); }
+    });
+    $$('.seg button', $('[data-fee="' + f.key + '"]')).forEach(function(b){
+      b.addEventListener('click', function(){ state.fees[f.key].mode = b.getAttribute('data-v'); touch(); syncStatic(); recalc(); });
+    });
+  });
+}
+$$('[data-seg]').forEach(function(g){
+  $$('button', g).forEach(function(b){
+    b.addEventListener('click', function(){ state[g.getAttribute('data-seg')] = b.getAttribute('data-v'); touch(); syncStatic(); recalc(); });
+  });
+});
+function syncStatic(){
+  FEES.forEach(function(f){
+    var fe = state.fees[f.key];
+    var inp = $('#fee-' + f.key); if (document.activeElement !== inp) inp.value = fe.val;
+    $$('.seg button', $('[data-fee="' + f.key + '"]')).forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-v') === fe.mode ? 'true' : 'false'); });
+  });
+  $$('[data-seg]').forEach(function(g){
+    var cur = state[g.getAttribute('data-seg')];
+    $$('button', g).forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-v') === cur ? 'true' : 'false'); });
+  });
+  $('#hint-taxbase').textContent = state.taxBase === 'withService'
+    ? 'Pajak dihitung dari subtotal ditambah service charge. Ini yang umum di restoran.'
+    : 'Service dan pajak sama-sama dihitung dari subtotal, tidak saling bertumpuk.';
+  $('#hint-disc').textContent = state.discOrder === 'before'
+    ? 'Diskon mengurangi subtotal lebih dulu, lalu service dan pajak dihitung dari angka setelah diskon.'
+    : 'Service dan pajak dihitung dari subtotal penuh. Diskon dipotong dari total akhir, dan diskon persen dihitung dari total setelah service dan pajak.';
+  $('#payBank').value = state.pay.bank; syncPayOther();
+  [['Other', 'other'], ['Number', 'number'], ['Holder', 'holder']].forEach(function(a){
+    var el = $('#pay' + a[0]); if (document.activeElement !== el) el.value = state.pay[a[1]];
+  });
+}
+
+/* ---------- state edits ---------- */
+function touch(){ if (state.sample) { state.sample = false; $('#sampleBar').hidden = true; } }
+
+/* ---------- recalc + paint ---------- */
+function recalc(){ last = computeBill(state); paintSplit(last); paintPeople(last); paintDash(last); }
+
+function itemVisible(id){
+  var it = state.items.filter(function(x){ return x.id === id; })[0];
+  return !!it && (it.touched || state.reviewed);
+}
+function alertHTML(list, title, goButtons){
+  var li = list.map(function(e){ return '<li>' + esc(e.msg) + '</li>'; }).join('');
+  return '<strong>' + title + '</strong><ul>' + li + '</ul>' + (goButtons || '');
+}
+function paintSplit(r){
+  var visible = r.E.filter(function(e){ return (e.scope === 'items' && itemVisible(e.itemId)) || e.scope === 'fees'; });
+  var a = $('#splitAlert');
+  a.hidden = !visible.length;
+  if (visible.length) a.innerHTML = alertHTML(visible, visible.length === 1 ? 'Ada 1 hal yang perlu dicek' : 'Ada ' + visible.length + ' hal yang perlu dicek');
+  $$('#itemsList .item').forEach(function(li){
+    var id = li.getAttribute('data-id'), it = state.items.filter(function(x){ return x.id === id; })[0];
+    var er = r.itemErr[id] || {price:'', who:''}, vis = it.touched || state.reviewed;
+    var meta = $('.rowmeta', li), price = $('[data-f="price"]', li);
+    price.setAttribute('aria-invalid', vis && er.price ? 'true' : 'false');
+    var msg = vis ? (er.price || er.who) : '';
+    if (msg) { meta.textContent = msg; meta.className = 'rowmeta err'; }
+    else {
+      var n = it.who.length, pr = parseNum(it.price, 'money');
+      meta.className = 'rowmeta';
+      if (pr.ok && !pr.empty && pr.value > 0 && n > 0) {
+        if (n === 1) { var p0 = state.people.filter(function(p){ return p.id === it.who[0]; })[0]; meta.textContent = 'Untuk ' + (p0 ? personLabel(p0) : '1 orang'); }
+        else meta.textContent = n + ' orang, masing-masing ' + idr(pr.value / n);
+      } else meta.textContent = '';
+    }
+  });
+  FEES.forEach(function(f){
+    var m = r.feeErr[f.key], el = $('#err-' + f.key);
+    el.hidden = !m; el.textContent = m || '';
+    $('#fee-' + f.key).setAttribute('aria-invalid', m ? 'true' : 'false');
+    var v = f.key === 'discount' ? r.D : f.key === 'service' ? r.svc : r.tax;
+    $('#amt-' + f.key).textContent = '= ' + idr(v);
+  });
+  var bad = r.E.length > 0, hasItems = state.items.length > 0;
+  $('#miniLabel').textContent = bad ? 'Hitungan belum lengkap' : 'Total bill';
+  $('#miniTotal').textContent = bad ? r.E.length + ' hal perlu dicek' : idr(r.totalR);
+  $('#miniBtn').textContent = bad ? 'Lihat detail' : 'Lihat hasil';
+  $('#minibar').hidden = !hasItems;
+  var nSplit = visible.length;
+  $('#tab-split').setAttribute('data-n', String(nSplit));
+}
+function paintPeople(r){
+  var pe = r.E.filter(function(e){ return e.scope === 'people'; });
+  var pw = r.W.filter(function(e){ return e.scope === 'pay'; });
+  var showPeople = pe.filter(function(e){ return state.people.length > 0 || state.items.length > 0; });
+  var a = $('#peopleAlert'), all = showPeople.concat(state.people.length ? pw : []);
+  a.hidden = !all.length;
+  if (all.length) a.innerHTML = alertHTML(all, 'Yang perlu dilengkapi');
+  var ne = $('#payErr'), numMsg = pw.filter(function(e){ return /hanya boleh angka/.test(e.msg); })[0];
+  ne.hidden = !numMsg; ne.textContent = numMsg ? numMsg.msg : '';
+  $('#payNumber').setAttribute('aria-invalid', numMsg ? 'true' : 'false');
+  $('#tab-teman').setAttribute('data-n', String(showPeople.length));
+}
+
+function payerName(r){ return r.payer ? personLabel(r.payer) : ''; }
+function bankLabel(){ return state.pay.bank === 'Lainnya' ? (state.pay.other.trim() || 'Bank/e-wallet') : state.pay.bank; }
+function dateText(){ try { return new Date().toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}); } catch (e) { return ''; } }
+function fmtDigits(s){ return payDigits(s).replace(/(\d{4})(?=\d)/g, '$1 '); }
+
+function strukHTML(r){
+  var fl = feeLines(r, state);
+  var parts = [{v:r.S, sign:1}].concat(fl.map(function(l){ return {v:l.amt, sign:l.sign}; }));
+  var rd = tieRound(parts, r.totalR);
+  var h = '<h2>Struk patungan</h2><p class="meta">' + esc(dateText()) + '</p><div class="rule"></div>' +
+    '<div class="ln"><span>Dibayari</span><span>' + esc(payerName(r)) + '</span></div>' +
+    '<div class="ln"><span>Peserta</span><span>' + state.people.length + ' orang</span></div>' +
+    '<div class="ln"><span>Menu</span><span>' + state.items.length + ' item</span></div><div class="rule"></div>' +
+    '<div class="ln"><span>Subtotal</span><span>' + idr(rd[0]) + '</span></div>';
+  fl.forEach(function(l, i){
+    h += '<div class="ln' + (l.sign < 0 ? ' neg' : '') + '"><span>' + esc(l.label) + '</span><span>' + (l.sign < 0 ? '− ' : '+ ') + idr(rd[i + 1]) + '</span></div>';
+  });
+  h += '<div class="rule"></div><div class="ln total"><span>TOTAL</span><span><span class="mark">' + idr(r.totalR) + '</span></span></div>' +
+    '<p class="foot">Dibagi sesuai porsi belanja masing-masing</p>';
+  return h;
+}
+function payCardHTML(r){
+  var name = esc(payerName(r)), num = state.pay.number.trim();
+  if (num && payNumberOk(num)) {
+    return '<div class="acct"><div class="hint" style="font-size:13px">Transfer ke ' + name + '</div>' +
+      '<div class="who"><span class="bank">' + esc(bankLabel() || 'Rekening') + '</span>' + (state.pay.holder.trim() ? '<span>a.n. ' + esc(state.pay.holder.trim()) + '</span>' : '') + '</div>' +
+      '<div class="num">' + esc(fmtDigits(num)) + '</div>' +
+      '<div><button type="button" class="btn primary small" data-copy="' + esc(payDigits(num)) + '" data-msg="Nomor rekening disalin">Salin nomor</button></div></div>';
+  }
+  return '<div class="acct missing"><b>Rekening ' + name + ' belum diisi</b><p class="hint">' +
+    (num ? 'Nomor yang diisi belum valid. Pakai angka saja, 5 sampai 20 digit.' : 'Isi bank atau e-wallet dan nomornya supaya teman bisa langsung transfer.') +
+    '</p><div><button type="button" class="btn small" data-go="teman" data-focus="#payNumber">Isi rekening</button></div></div>';
+}
+function detailHTML(row, r){
+  var w = row.w, S = r.S;
+  var mine = r.lines.filter(function(l){ return l.who.indexOf(row.p.id) >= 0; });
+  var h = mine.map(function(l){
+    return '<div class="ln"><span>' + esc(l.label) + (l.who.length > 1 ? ' ÷' + l.who.length : '') + '</span><span>' + idr(l.price / l.who.length) + '</span></div>';
+  }).join('') || '<div class="ln"><span>Tidak ada menu atas nama ini</span><span></span></div>';
+  var fl = feeLines(r, state);
+  var parts = [{v:row.items, sign:1}].concat(fl.map(function(l){ return {v:l.amt * w, sign:l.sign}; }));
+  var target = Math.round(row.exact);
+  var rd = tieRound(parts, target);
+  h += '<div class="ln sub"><span>Subtotal menu</span><span>' + idr(rd[0]) + '</span></div>';
+  fl.forEach(function(l, i){
+    if (rd[i + 1] === 0) return;
+    h += '<div class="ln"><span>' + esc(l.label) + '</span><span>' + (l.sign < 0 ? '− ' : '+ ') + idr(rd[i + 1]) + '</span></div>';
+  });
+  if (row.isPayer && row.diff) h += '<div class="ln"><span>Penyesuaian pembulatan</span><span>' + (row.diff > 0 ? '+ ' : '− ') + idr(Math.abs(row.diff)) + '</span></div>';
+  h += '<div class="ln end sub"><span>' + (row.isPayer ? 'Porsi sendiri' : 'Transfer') + '</span><span>' + idr(row.pay) + '</span></div>';
+  return h;
+}
+function paintDash(r){
+  var noItems = state.items.length === 0;
+  var empty = $('#dashEmpty'), alertEl = $('#dashAlert'), main = $('#dashMain');
+  empty.hidden = !noItems; alertEl.hidden = true; main.hidden = true;
+  if (noItems) {
+    $('h2', empty).textContent = state.people.length ? 'Menu belum diisi' : 'Belum ada bill yang dihitung';
+    return;
+  }
+  if (r.E.length) {
+    var scopes = {}; r.E.forEach(function(e){ scopes[e.scope] = true; });
+    var btns = '<div class="row">' +
+      ((scopes.items || scopes.fees) ? '<button type="button" class="btn small" data-go="split">Buka Split Bill</button>' : '') +
+      (scopes.people ? '<button type="button" class="btn small" data-go="teman">Buka Teman</button>' : '') + '</div>';
+    alertEl.innerHTML = alertHTML(r.E, 'Hitungan belum lengkap, jadi belum ada angka yang ditampilkan', btns);
+    alertEl.hidden = false; return;
+  }
+  main.hidden = false;
+  $('#struk').innerHTML = strukHTML(r);
+  $('#payCard').innerHTML = payCardHTML(r);
+  var nm = payerName(r);
+  $('#inflow').textContent = 'Masuk ke ' + nm + ': ' + idr(r.inflow);
+  var rows = r.rows.filter(function(x){ return !x.isPayer; }).concat(r.rows.filter(function(x){ return x.isPayer; }));
+  $('#owedList').innerHTML = rows.map(function(row){
+    var id = row.p.id, open = !!openIds[id], nmx = personLabel(row.p);
+    var sub = row.isPayer ? 'Pembayar, porsi sendiri' : (row.items > 0 ? 'Transfer ke ' + nm : 'Tidak ada pesanan');
+    return '<li class="owe' + (row.isPayer ? ' payer' : '') + '" data-id="' + id + '"><div class="owe-row">' +
+      '<button type="button" class="owe-toggle" data-act="toggle" aria-expanded="' + open + '">' +
+        '<span class="avatar" aria-hidden="true">' + esc(nmx.charAt(0).toUpperCase()) + '</span>' +
+        '<span class="owe-name">' + esc(nmx) + '<small>' + esc(sub) + '</small></span>' +
+        '<span class="owe-amt">' + idr(row.pay) + '</span></button>' +
+      (row.isPayer || row.pay <= 0 ? '' : '<button type="button" class="copy-btn" data-copy="' + row.pay + '" data-msg="Jumlah ' + esc(nmx) + ' disalin">Salin</button>') +
+      '</div><div class="owe-detail"' + (open ? '' : ' hidden') + '>' + detailHTML(row, r) + '</div></li>';
+  }).join('');
+  var payerRow = r.rows.filter(function(x){ return x.isPayer; })[0];
+  var note = 'Dibulatkan ke rupiah penuh.';
+  if (payerRow && payerRow.diff) note += ' Selisih ' + idr(Math.abs(payerRow.diff)) + ' ' + (payerRow.diff > 0 ? 'ditambahkan ke' : 'dikurangkan dari') + ' porsi ' + nm + ', jadi jumlah semua orang tetap pas dengan total bill.';
+  else note += ' Jumlah semua orang pas dengan total bill.';
+  $('#roundNote').textContent = note + ' Tekan nama untuk melihat rincian.';
+}
+$('#owedList').addEventListener('click', function(e){
+  var t = e.target.closest('[data-act="toggle"]'); if (!t) return;
+  var li = t.closest('.owe'), id = li.getAttribute('data-id'), d = $('.owe-detail', li);
+  openIds[id] = !openIds[id]; d.hidden = !openIds[id]; t.setAttribute('aria-expanded', openIds[id] ? 'true' : 'false');
+});
+document.addEventListener('click', function(e){
+  var c = e.target.closest('[data-copy]'); if (!c) return;
+  copyText(c.getAttribute('data-copy'), c.getAttribute('data-msg') || 'Disalin');
+});
+
+/* ---------- reset ---------- */
+var resetT, armed = false;
+function doReset(){
+  state = blankState(); openIds = {}; armed = false;
+  $('#sampleBar').hidden = true; $('#resetBtn').textContent = 'Bill baru';
+  renderPeople(); renderItems(); syncStatic(); recalc();
+  showTab('teman', '#newName');
+}
+$('#sampleClear').addEventListener('click', doReset);
+$('#resetBtn').addEventListener('click', function(){
+  var b = $('#resetBtn');
+  if (state.sample || (!state.people.length && !state.items.length)) return doReset();
+  if (!armed) {
+    armed = true; b.textContent = 'Yakin? Tekan lagi';
+    clearTimeout(resetT); resetT = setTimeout(function(){ armed = false; b.textContent = 'Bill baru'; }, 4000);
+  } else { clearTimeout(resetT); doReset(); }
+});
+
+/* ---------- boot ---------- */
+buildFees(); bindPay();
+renderPeople(); renderItems(); syncStatic(); recalc();
+showTab('dash');
+})();
+</script>
+
+</body>
+</html>
